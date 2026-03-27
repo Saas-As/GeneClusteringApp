@@ -112,18 +112,18 @@ namespace GeneClusteringApp.Clustering
 
             for(int gene = 0; gene < genes; gene++)
             {
-                double minDistanse = double.MaxValue;
+                double minDistance = double.MaxValue;
                 int bestCluster = -1;
 
                 double[] geneVector = data.GetGeneVector(gene);
 
                 for(int cluster = 0; cluster < _k;  cluster++)
                 {
-                    double distanse = SquaredEuclideanDistance(geneVector, centroids[cluster]);
+                    double distance = SquaredEuclideanDistance(geneVector, centroids[cluster]);
 
-                    if(distanse < minDistanse)
+                    if(distance < minDistance)
                     {
-                        minDistanse = distanse;
+                        minDistance = distance;
                         bestCluster = cluster;
                     }
                 }
@@ -191,6 +191,22 @@ namespace GeneClusteringApp.Clustering
                 // Если кластер пуст — оставляем нулевой вектор
             }
 
+            // После вычисления средних, проверяем пустые кластеры
+            for (int cluster = 0; cluster < _k; cluster++)
+            {
+                if (counts[cluster] == 0)
+                {
+                    // Переинициализируем пустой кластер случайным геном
+                    int randomGene = _random.Next(data.GeneCount);
+                    double[] randomVector = data.GetGeneVector(randomGene);
+                    for (int s = 0; s < samples; s++)
+                    {
+                        newCentroids[cluster][s] = randomVector[s];
+                    }
+                    Console.WriteLine($"  [Внимание] Кластер {cluster} был пуст, переинициализирован");
+                }
+            }
+
             return newCentroids;
         }
 
@@ -206,6 +222,36 @@ namespace GeneClusteringApp.Clustering
                     return false; // Есть изменения больше порога — не сошлись
             }
             return true; // Все изменения меньше порога — сошлись
+        }
+
+        /// <summary>
+        /// Выполняет кластеризацию и возвращает метки и центроиды
+        /// </summary>
+        public (int[] labels, double[][] centroids) ClusterWithCentroids(GeneMatrix data)
+        {
+            int genes = data.GeneCount;
+            int samples = data.SampleCount;
+
+            // Инициализация
+            double[][] centroids = InitializeCentroids(data);
+            int[] labels = new int[genes];
+
+            // Основной цикл
+            for (int iteration = 0; iteration < _maxIterations; iteration++)
+            {
+                int[] newLabels = AssignClusters(data, centroids);
+                double[][] newCentroids = RecalculateCentroids(data, newLabels, samples);
+
+                bool converged = CheckConvergence(centroids, newCentroids);
+
+                centroids = newCentroids;
+                labels = newLabels;
+
+                if (converged)
+                    break;
+            }
+
+            return (labels, centroids);
         }
     }
 }

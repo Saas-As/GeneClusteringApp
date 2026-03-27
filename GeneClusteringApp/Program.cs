@@ -1,5 +1,6 @@
 ﻿using GeneClusteringApp.Clustering;
 using GeneClusteringApp.Data;
+using GeneClusteringApp.Evaluation;
 
 namespace GeneClusteringApp;
 
@@ -56,7 +57,8 @@ class Program
         //    }
         // Генерируем данные с известной кластерной структурой
 
-        Console.WriteLine("Генерация данных с 4 кластерами...");
+        // ========== ТЕСТ 1: Данные с кластерами ==========
+        Console.WriteLine("1. Генерация данных с 4 кластерами...");
         var data = SyntheticDataGenerator.GenerateWithClusters(
             genes: 500,
             samples: 10,
@@ -65,29 +67,46 @@ class Program
 
         data.PrintInfo();
 
-        // Запускаем k-means
-        Console.WriteLine("\nЗапуск k-means с k=4...");
+        Console.WriteLine("\n2. Запуск k-means с k=4...");
         var kmeans = new KMeans(k: 4, maxIterations: 50);
+        var (labels, centroids) = kmeans.ClusterWithCentroids(data);
 
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        int[] labels = kmeans.Cluster(data);
-        stopwatch.Stop();
+        Console.WriteLine("\n3. Оценка качества кластеризации:");
 
-        Console.WriteLine($"Кластеризация завершена за {stopwatch.ElapsedMilliseconds} мс");
+        double inertia = InertiaCalculator.Calculate(data, labels, centroids);
+        double silhouette = SilhouetteAnalyzer.AverageSilhouette(data, labels, 4);
 
-        // Выводим статистику по кластерам
+        Console.WriteLine($"   Inertia (сумма квадратов): {inertia:F2}");
+        Console.WriteLine($"   Silhouette Score: {silhouette:F4}");
+        Console.WriteLine($"   Интерпретация: {SilhouetteAnalyzer.Interpret(silhouette)}");
+
+        // Выводим размеры кластеров
         int[] clusterSizes = new int[4];
         for (int i = 0; i < labels.Length; i++)
         {
-            clusterSizes[labels[i]]++;
+            if (labels[i] >= 0 && labels[i] < 4)
+                clusterSizes[labels[i]]++;
+            else
+                Console.WriteLine($"  [Ошибка] Ген {i} имеет метку {labels[i]}");
         }
 
-        Console.WriteLine("\nРазмеры кластеров:");
+        Console.WriteLine("\n4. Размеры кластеров:");
         for (int i = 0; i < 4; i++)
         {
-            Console.WriteLine($"  Кластер {i}: {clusterSizes[i]} генов");
+            Console.WriteLine($"   Кластер {i}: {clusterSizes[i]} генов");
         }
+
+        // Проверяем, насколько хорошо распределены кластеры
+        double expectedSize = 500.0 / 4;
+        Console.WriteLine($"\n   Ожидаемый размер (равномерный): {expectedSize:F0} генов на кластер");
+
+        // ========== ТЕСТ 2: Случайные данные ==========
+        Console.WriteLine("\n5. Тест на случайных данных (без структуры):");
+        var randomData = SyntheticDataGenerator.GenerateRandom(genes: 500, samples: 10);
+        var (randomLabels, randomCentroids) = kmeans.ClusterWithCentroids(randomData);
+
+        double randomSilhouette = SilhouetteAnalyzer.AverageSilhouette(randomData, randomLabels, 4);
+        Console.WriteLine($"   Silhouette Score: {randomSilhouette:F4}");
+        Console.WriteLine($"   Интерпретация: {SilhouetteAnalyzer.Interpret(randomSilhouette)}");
     }
-
-
 }
