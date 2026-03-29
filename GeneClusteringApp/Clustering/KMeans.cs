@@ -12,6 +12,10 @@ namespace GeneClusteringApp.Clustering
         private readonly double _tolerance;         // Порог сходимости
         private readonly Random _random;            // Генератор случайных чисел
         private readonly bool _useKMeansPlusPlus;
+        /// <summary>
+        /// Количество итераций, выполненных при последней кластеризации
+        /// </summary>
+        public int LastIterationCount { get; private set; } 
 
         /// <summary>
         /// Конструктор алгоритма k-means
@@ -242,9 +246,10 @@ namespace GeneClusteringApp.Clustering
                 ? InitializeCentroidsPlusPlus(data)
                 : InitializeCentroids(data);
             int[] labels = new int[genes];
+            int iteration;
 
             // Основной цикл
-            for (int iteration = 0; iteration < _maxIterations; iteration++)
+            for (iteration = 0; iteration < _maxIterations; iteration++)
             {
                 int[] newLabels = AssignClusters(data, centroids);
                 double[][] newCentroids = RecalculateCentroids(data, newLabels, samples);
@@ -260,7 +265,7 @@ namespace GeneClusteringApp.Clustering
                     break;
                 }
             }
-
+            LastIterationCount = iteration + 1;
             return (labels, centroids);
         }
 
