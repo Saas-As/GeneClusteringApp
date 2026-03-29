@@ -11,6 +11,7 @@ namespace GeneClusteringApp.Clustering
         private readonly int _maxIterations;        // Максимальное число итераций
         private readonly double _tolerance;         // Порог сходимости
         private readonly Random _random;            // Генератор случайных чисел
+        private readonly bool _useKMeansPlusPlus;
 
         /// <summary>
         /// Конструктор алгоритма k-means
@@ -18,12 +19,14 @@ namespace GeneClusteringApp.Clustering
         /// <param name="k">Количество кластеров</param>
         /// <param name="maxIterations">Максимальное число итераций (по умолчанию 100)</param>
         /// <param name="tolerance">Порог сходимости (по умолчанию 0.0001)</param>
-        public KMeans(int k, int maxIterations = 100, double tolerance = 1e-4)
+        /// <param name="useKMeansPlusPlus">Использовать k-means++ для инициализации</param>
+        public KMeans(int k, int maxIterations = 100, double tolerance = 1e-4, bool useKMeansPlusPlus = true)
         {
             _k = k;
             _maxIterations = maxIterations;
             _tolerance = tolerance;
-            _random = new Random(42); // Фиксированный seed для воспроизводимости
+            _random = new Random(42);
+            _useKMeansPlusPlus = useKMeansPlusPlus;
         }
 
         public int[] Cluster(GeneMatrix data)
@@ -32,7 +35,9 @@ namespace GeneClusteringApp.Clustering
             int samples = data.SampleCount;
 
             // ШАГ 1: Инициализация центроидов
-            double[][] centroids = InitializeCentroids(data);
+            double[][] centroids = _useKMeansPlusPlus
+                ? InitializeCentroidsPlusPlus(data)
+                : InitializeCentroids(data);
 
             // Массив для хранения принадлежности генов к кластерам
             int[] labels = new int[genes];
@@ -233,7 +238,9 @@ namespace GeneClusteringApp.Clustering
             int samples = data.SampleCount;
 
             // Инициализация
-            double[][] centroids = InitializeCentroids(data);
+            double[][] centroids = _useKMeansPlusPlus
+                ? InitializeCentroidsPlusPlus(data)
+                : InitializeCentroids(data);
             int[] labels = new int[genes];
 
             // Основной цикл
@@ -248,10 +255,83 @@ namespace GeneClusteringApp.Clustering
                 labels = newLabels;
 
                 if (converged)
+                {
+                    Console.WriteLine($"  Алгоритм сошёлся на итерации {iteration + 1}");
                     break;
+                }
             }
 
             return (labels, centroids);
+        }
+
+        /// <summary>
+        /// Инициализация центроидов методом k-means++
+        /// Центроиды выбираются так, чтобы быть далеко друг от друга
+        /// </summary>
+        private double[][] InitializeCentroidsPlusPlus(GeneMatrix data)
+        {
+            int genes = data.GeneCount;
+            int samples = data.SampleCount;
+
+            double[][] centroids = new double[_k][];
+            for (int i = 0; i < _k; i++)
+                centroids[i] = new double[samples];
+
+            // Шаг 1: Выбираем первый центроид случайно
+            int firstIndex = _random.Next(genes);
+            double[] firstVector = data.GetGeneVector(firstIndex);
+            for (int s = 0; s < samples; s++)
+                centroids[0][s] = firstVector[s];
+
+            // Шаг 2: Выбираем остальные центроиды
+            for (int i = 1; i < _k; i++)
+            {
+                // Вычисляем расстояния до ближайшего центроида для каждого гена
+                double[] minDistances = new double[genes];
+                double totalDistance = 0;
+
+                for (int gene = 0; gene < genes; gene++)
+                {
+                    double[] geneVector = data.GetGeneVector(gene);
+                    double minDist = double.MaxValue;
+
+                    // Находим минимальное расстояние до уже выбранных центроидов
+                    for (int j = 0; j < i; j++)
+                    {
+                        double dist = SquaredEuclideanDistance(geneVector, centroids[j]);
+                        if (dist < minDist)
+                            minDist = dist;
+                    }
+
+                    minDistances[gene] = minDist;
+                    totalDistance += minDist;
+                }
+
+                // Выбираем следующий центроид с вероятностью, пропорциональной расстоянию
+                double target = _random.NextDouble() * totalDistance;
+                double cumulative = 0;
+                int selectedIndex = -1;
+
+                for (int gene = 0; gene < genes; gene++)
+                {
+                    cumulative += minDistances[gene];
+                    if (cumulative >= target)
+                    {
+                        selectedIndex = gene;
+                        break;
+                    }
+                }
+
+                // Если по какой-то причине не выбрали, берём последний
+                if (selectedIndex == -1)
+                    selectedIndex = genes - 1;
+
+                double[] selectedVector = data.GetGeneVector(selectedIndex);
+                for (int s = 0; s < samples; s++)
+                    centroids[i][s] = selectedVector[s];
+            }
+
+            return centroids;
         }
     }
 }
