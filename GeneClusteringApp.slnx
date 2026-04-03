@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="GeneClusteringApp.Tests/GeneClusteringApp.Tests.csproj" Id="3c8726fe-69fa-425c-90df-6f289596b9c8" />
   <Project Path="GeneClusteringApp/GeneClusteringApp.csproj" />
   <Project Path="GeneClusteringWPFApp/GeneClusteringWPFApp.csproj" Id="c2dce14d-4eba-4362-84b7-18d9bd519970" />
 </Solution>
